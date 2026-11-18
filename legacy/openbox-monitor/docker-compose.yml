@@ -1,0 +1,19 @@
+services:
+  openbox-monitor:
+    build: .
+    image: openbox-monitor:latest
+    container_name: openbox-monitor
+    restart: unless-stopped     # 机器重启 / 进程崩溃后自动拉起
+    init: true                  # 正确转发 SIGTERM
+    stop_grace_period: 30s      # 正在发请求时最多等一个请求超时再退出
+    environment:
+      TZ: America/New_York      # 静默时段按这个时区算
+    ports:
+      - "8787:8787"             # 页面：http://<主机 IP>:8787/ ；只想本机访问改成 "127.0.0.1:8787:8787"
+    volumes:
+      - ./data:/data            # config.yaml、数据库、页面、日志都在这里
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

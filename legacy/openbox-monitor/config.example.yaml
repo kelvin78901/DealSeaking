@@ -1,0 +1,109 @@
+# ─────────────────────────────────────────────────────────────
+#  Open Box Monitor 配置
+#  复制为 config.yaml 后修改：cp config.example.yaml config.yaml
+#  所有字段都可以删掉不写，会用这里的默认值。
+# ─────────────────────────────────────────────────────────────
+
+# 检查频率（分钟）。watch 模式和 launchd 定时任务都读这个值。
+interval_minutes: 180
+
+# 静默时段：这段时间内跳过检查（本地时间，可跨午夜）。设为 [] 关闭。
+quiet_hours: ["23:30", "08:30"]
+
+# 你的位置。stores: auto 时，会监控 radius_miles 英里内的所有 Micro Center。
+# ZIP 一定要加引号（07504 这种以 0 开头的不加引号会被 YAML 当成八进制数）。
+location:
+  zip: "20852"
+  radius_miles: 50
+
+sources:
+  # Micro Center 会拦截脚本访问，自动抓取靠模拟浏览器指纹（curl_cffi）绕过：
+  # 可能违反其使用条款、IP 可能被临时限制；请保持低频率。scrape: false 则只在页面显示门店链接。
+  microcenter:
+    enabled: true                # false = 完全不管 Micro Center
+    scrape: true                 # 自动抓取 open box
+    # 门店：auto = 按上面的 location 自动选；也可以写列表（名字或加引号的 3 位 ID）：
+    #   stores: [Rockville, Fairfax, "125"]
+    # 全部门店：Rockville, Fairfax, Parkville, Cambridge, North Jersey, Brooklyn,
+    #       Flushing, Yonkers, Westbury, St. Davids, Columbus, Mayfield Heights,
+    #       Sharonville, Madison Heights, Chicago, Westmont, Indianapolis,
+    #       St. Louis Park, Brentwood, Overland Park, Denver, Phoenix, Tustin,
+    #       Santa Clara, Dallas, Houston, Austin, Duluth, Marietta, Charlotte,
+    #       Miami, Shippable（线上可发货）
+    stores: auto
+    # 抓取范围：
+    #   all = 每家店的全部 open box 一次抓完（电脑、显卡、显示器、存储…全都存下，页面按分类 tag 筛）
+    #   或写列表，只抓这些（大类和存储细分可以混写）：
+    #     大类：computers, apple, computer_parts, electronics, networking, gaming, accessories
+    #     存储：ssd, hdd_internal, hdd_external, nas, usb_flash, memory_card, enclosure
+    #   例：categories: [computers, ssd, hdd_internal]
+    # 改动范围后的第一轮只记基线、不推送，免得一下子把一整店的商品当“新上架”推给你
+    categories: all
+    include_out_of_stock: false
+    request_delay_seconds: 3.0   # 请求间隔（秒）；all 每家店约 每 96 件 1 次请求
+    # 依次尝试的浏览器指纹，能用的那个会被记住（data/fetch_state.json），下次优先用
+    impersonate: [safari, safari_ios, firefox, chrome, edge]
+
+  # Best Buy：线上 open box（不分门店），只抓搜索结果页。
+  # 商品详情页有反爬保护（会直接断开连接），这里不去碰。搜索页每页 18 件，Best Buy 只给前 4 件
+  # 带 open box 价格，所以只能看到这一部分；排到前面过的商品，价格会记住 keep_price_days 天。
+  bestbuy:
+    enabled: false
+    # 搜索词（自动加 Open-Box 筛选，Best Buy 会自己归到某个大类），
+    # 或者在 Best Buy 网站上选好分类、勾上 Open-Box 后，把地址栏的链接整个粘进来
+    searches: ["ssd"]
+    max_pages: 15                # 每页 18 件
+    keep_price_days: 7
+    request_delay_seconds: 3.0
+    impersonate: safari          # 只用一种指纹，被拒就停，不轮换
+
+# ── 推送过滤：抓到的商品全部入库、页面都能看；只有满足这里的才推送 ─────────
+#    （页面上的「只看符合推送条件的」开关用的也是这一套）
+filters:
+  # 只推这些分类（网站自己的分类名，Micro Center 如 "SSD (Solid State Drives)"，
+  # Best Buy 如 "Laptop Computer"；设置页里能勾选所有出现过的 tag），[] = 全部分类
+  tags: ["SSD (Solid State Drives)", "Internal Hard Drives", "External Hard Drives",
+         "NAS (Network Attached Storage)", "USB Flash Drives", "Flash Memory"]
+  min_capacity_gb: 0        # 0 = 不限；1TB 写 1000（只对存储类有效）
+  max_capacity_gb: 0
+  max_price: 0              # open box 价上限（美元），0 = 不限
+  min_discount_pct: 0       # 相对新品价的最低折扣 %，0 = 不限
+  max_price_per_tb: 0       # $/TB 上限，0 = 不限（只对存储类有效）
+  brands: []                # 只看这些品牌（大小写不敏感），空 = 全部
+  include_keywords: []      # 名称至少包含其中一个，空 = 不限
+  exclude_keywords: []      # 名称包含其中任一就不推
+
+# ── 推送规则 ─────────────────────────────────────────────────
+alerts:
+  on_new: true              # 新上架的 open box
+  on_price_drop: true       # 降价
+  min_drop_pct: 3           # 降价超过这个百分比才推
+  on_restock: true          # 消失后又重新出现
+  max_per_run: 6            # 单轮最多推几条，超出的合并成一条汇总
+  # 关注清单：名称命中任一关键词的商品，只要有变化就推送（无视上面的 filters，任何分类都行）
+  watchlist: []             # 例：["990 PRO", "SN850X", "ThinkPad X1", "RTX 5080"]
+
+# ── 推送渠道（可同时开多个）──────────────────────────────────
+notify:
+  macos: true               # 系统通知；装了 terminal-notifier 可以点通知直接打开商品页
+  ntfy:                     # 手机推送最省事：装 ntfy App，订阅一个只有你知道的 topic
+    enabled: false
+    server: https://ntfy.sh
+    topic: ""
+  bark:                     # iOS Bark
+    enabled: false
+    server: https://api.day.app
+    key: ""
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+
+# ── 监控页面 ─────────────────────────────────────────────────
+dashboard:
+  path: dashboard.html      # 每轮跑完重新生成
+  history_days: 30          # 价格走势天数
+  open_after_run: false     # 每次跑完自动用浏览器打开
+
+database: data/openbox.db
+log_file: data/monitor.log

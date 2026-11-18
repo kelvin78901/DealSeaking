@@ -1,0 +1,11 @@
+data/
+.venv/
+venv/
+tests/
+**/__pycache__/
+*.pyc
+*.zip
+.git/
+.pytest_cache/
+config.yaml
+dashboard.html

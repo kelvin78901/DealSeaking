@@ -1,0 +1,5 @@
+requests>=2.31
+beautifulsoup4>=4.12
+PyYAML>=6.0
+zipcodes>=1.2            # 离线 ZIP → 经纬度，用于按距离选门店
+curl_cffi>=0.10          # 抓 Micro Center 用的浏览器指纹（safari / firefox 等）

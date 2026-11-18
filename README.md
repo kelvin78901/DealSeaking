@@ -15,6 +15,9 @@
 | [docs/schema.sql](docs/schema.sql) | Postgres 表结构草案 |
 | [docs/collector-protocol.md](docs/collector-protocol.md) | 用户采集端协议（Micro Center） |
 | [docs/plan-black-friday.md](docs/plan-black-friday.md) | 黑五上线计划（11/27），逐日任务、取舍与预案 |
+| [docs/tasks.md](docs/tasks.md) | 任务清单：Kelvin 要办的事，以及可直接派给 Claude Code 的任务简报 |
+| [CLAUDE.md](CLAUDE.md) | 给 Claude Code 的目录约定与硬性规则 |
+| [legacy/openbox-monitor](legacy/openbox-monitor) | 原 Open Box 监控工具，只作参考，新代码不 import |
 
 ![系统架构](docs/architecture.svg)
 
