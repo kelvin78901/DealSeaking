@@ -1,4 +1,4 @@
--- DealSeaking — Postgres schema draft v0.2 (2026-11-17)
+-- DealSeaking — Postgres schema draft v0.3 (2026-11-17)
 -- Design reference only; real migrations will live in the app (Alembic).
 -- Target: PostgreSQL 16+. Extensions: pg_trgm (fuzzy title search), citext (emails).
 
@@ -162,9 +162,58 @@ CREATE TABLE deal_events (
     new_price   numeric(10,2),
     hot_score   real,
     baseline    boolean NOT NULL DEFAULT false,      -- first look at a scope: stored, never alerted
+    needs_confirmation boolean NOT NULL DEFAULT false, -- anomalous crowd-sourced price: wait for a second crawl
+    confirmed_at timestamptz,
     detected_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX ON deal_events (detected_at DESC);
+
+-- ───────────────────────────── user collectors (docs/collector-protocol.md) ─────────────────────────────
+
+CREATE TABLE collectors (
+    id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id       bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash    bytea  NOT NULL UNIQUE,
+    kind          text   NOT NULL CHECK (kind IN ('extension', 'docker')),
+    client        text,                              -- e.g. 'extension/0.1.0'
+    status        text   NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'revoked')),
+    trust_score   real   NOT NULL DEFAULT 1.0,
+    blocked_until timestamptz,                       -- set after a 403 / challenge: 24h back-off
+    consented_at  timestamptz NOT NULL,              -- opt-in to fetching microcenter.com on their network
+    last_seen_at  timestamptz,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE collector_stores (                      -- stores the user chose to cover
+    collector_id bigint NOT NULL REFERENCES collectors(id) ON DELETE CASCADE,
+    store_id     bigint NOT NULL REFERENCES stores(id),
+    PRIMARY KEY (collector_id, store_id)
+);
+
+CREATE TABLE crawls (                                -- one leased pass over one store
+    id             text PRIMARY KEY,                 -- crawl_id handed to the collector
+    collector_id   bigint NOT NULL REFERENCES collectors(id) ON DELETE CASCADE,
+    store_id       bigint NOT NULL REFERENCES stores(id),
+    status         text NOT NULL DEFAULT 'leased' CHECK (status IN ('leased', 'complete', 'expired', 'blocked', 'rejected')),
+    pages_expected int,                              -- known after page 1
+    pages_received int NOT NULL DEFAULT 0,
+    parser_version text,
+    leased_at      timestamptz NOT NULL DEFAULT now(),
+    lease_expires  timestamptz NOT NULL,
+    finished_at    timestamptz
+);
+-- one active lease per store at a time
+CREATE UNIQUE INDEX ON crawls (store_id) WHERE status = 'leased';
+
+CREATE TABLE raw_pages (                             -- original HTML, kept 7 days for re-parsing / audits
+    crawl_id     text NOT NULL REFERENCES crawls(id) ON DELETE CASCADE,
+    page         int  NOT NULL,
+    fetched_at   timestamptz NOT NULL,
+    http_status  int  NOT NULL,
+    html_gz      bytea NOT NULL,
+    parsed_items int,
+    PRIMARY KEY (crawl_id, page)
+);
 
 -- ───────────────────────────── rules & notifications ─────────────────────────────
 

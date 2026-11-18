@@ -13,6 +13,8 @@
 | [docs/architecture.svg](docs/architecture.svg) | 系统架构图 |
 | [docs/rule.schema.json](docs/rule.schema.json) | 监控规则的 JSON Schema，示例见 [docs/examples/rule-ssd.json](docs/examples/rule-ssd.json) |
 | [docs/schema.sql](docs/schema.sql) | Postgres 表结构草案 |
+| [docs/collector-protocol.md](docs/collector-protocol.md) | 用户采集端协议（Micro Center） |
+| [docs/plan-black-friday.md](docs/plan-black-friday.md) | 黑五上线计划（11/27），逐日任务、取舍与预案 |
 
 ![系统架构](docs/architecture.svg)
 
@@ -22,15 +24,17 @@
 - Postgres 16
 - 前端：Jinja + htmx（服务端渲染）
 - 邮件：Resend；收款：Stripe；注册防机器人：Cloudflare Turnstile
-- 部署：单台 VPS（Docker Compose），加一个家用采集节点
+- 部署：单台 VPS（Docker Compose）；Micro Center 数据由用户自愿运行的采集端（浏览器扩展 / Docker）在自己的网络上采集，汇总共享
 
 ## 路线
+
+当前目标：11 月 25 日公开上线，赶上黑五。逐日计划见 [docs/plan-black-friday.md](docs/plan-black-friday.md)。
 
 1. 把 openbox-monitor 重构成 source adapter + 公共流水线，换成 Postgres
 2. 接 Best Buy API、Woot API、DealNews RSS，并做跨来源的商品匹配
 3. 门户 MVP：登录、deal feed、规则、每日摘要、退订
-4. 商业化：Free / Pro 套餐、Stripe、联盟链接、条款与披露
-5. 公开上线，扩展数据源和推送渠道
+4. 公开上线（黑五），条款与披露
+5. 商业化：Free / Pro 套餐、Stripe、联盟链接；扩展数据源和推送渠道
 
 详见 [docs/design.md#实施路线](docs/design.md#实施路线)。
 

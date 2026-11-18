@@ -1,6 +1,6 @@
 # DealSeaking：功能设计与技术方案
 
-> 状态：设计稿 v0.2 · 更新于 2026-11-17 · 由 openbox-monitor（Micro Center / Best Buy open box 监控）演进而来
+> 状态：设计稿 v0.3 · 更新于 2026-11-17 · 黑五上线计划见 [plan-black-friday.md](plan-black-friday.md) · 由 openbox-monitor（Micro Center / Best Buy open box 监控）演进而来
 
 DealSeaking 是一个面向美国市场的电子产品 deal 监控门户：**开放注册、计划商业化**。用户按品类、型号、价格等规则订阅，命中后收到邮件或推送。
 
@@ -45,7 +45,7 @@ MVP 只做“浏览 + 规则 + 邮件提醒 + 免费 / 付费两档”，并把�
 | Deal 浏览 | 统一 feed；按分类、品牌、价格、折扣、来源、成色（新品 / open box / 翻新）筛选和排序 | 商品详情页：价格走势、跨店比价、历史最低标记 | 热度排序 |
 | 监控规则 | 品类、关键词（含排除词）、型号、价格上限、折扣下限；事件：新上架、降价、补货；按套餐限制规则数 | 粘贴商品链接直接跟踪；单位价（如每 TB 价格）；门店距离；历史新低 | 规则模板、一键订阅热门规则 |
 | 通知 | 邮件即时提醒（Pro）+ 每日摘要（所有人），一键退订 | Web Push（PWA）、Telegram、Discord、ntfy | 每周摘要、App 推送 |
-| 数据源 | Best Buy API、Woot API、DealNews RSS；Micro Center（见[待定问题](#待定问题)）；Slickdeals 搜索 RSS 只用于规则匹配，未获授权前不在门户展示 | eBay Browse API、Walmart Affiliate API、Amazon（路线见[待定问题](#待定问题)） | 联盟网络商品 feed（Impact、CJ、Rakuten） |
+| 数据源 | Best Buy API、Woot API、DealNews RSS；Micro Center（用户采集端，见[决策 #6](decisions.md)）；Slickdeals 搜索 RSS 只用于规则匹配，未获授权前不在门户展示 | eBay Browse API、Walmart Affiliate API、Amazon（路线见[待定问题](#待定问题)） | 联盟网络商品 feed（Impact、CJ、Rakuten） |
 | 变现 | 出站链接统一走跳转服务（记录点击，按来源加联盟参数），页面和邮件披露 | 联盟收入报表 | 精选 deal 位 |
 | 链接与质量 | 发信前重新校验链接与库存，过期 deal 自动下架；用户提交链接过 Web Risk | 失效自动重试、用户举报 | — |
 | 管理后台 | 数据源健康度、抓取失败率、队列积压、注册与发信量 | 退信 / 投诉监控、手动合并重复商品、订阅与收入 | 运营数据看板 |
@@ -142,11 +142,11 @@ DealNews 的 feed 要求保留它自己的推荐链接，这部分没有我们�
 
 ## 系统架构
 
-一台服务器跑门户、数据库和走 API / RSS 的采集；只认住宅 IP 的站点（目前是 Micro Center）由家里现有的容器抓，结果用 HTTPS 推给服务器。
+一台服务器跑门户、数据库和走 API / RSS 的采集。只认住宅 IP 的站点（目前是 Micro Center）由用户自愿运行的采集端抓取：浏览器扩展或 Docker 采集器，用用户自己的网络，只上传原始页面，服务器统一解析并合并成所有用户共享的存档。协议见 [collector-protocol.md](collector-protocol.md)。
 
 ![系统架构](architecture.svg)
 
-这样服务器的机房 IP 不碰容易被拦的站点，家里的节点也不用对外开放端口。商业化后新增两个外部依赖：Stripe（订阅与 webhook）和联盟网络（出站链接参数、佣金报表），都只和门户 / API 交互。
+这样服务器的机房 IP 不碰容易被拦的站点；采集端主动向服务器领任务、传结果，不需要对外开放端口；覆盖面随用户数增长。商业化后新增两个外部依赖：Stripe（订阅与 webhook）和联盟网络（出站链接参数、佣金报表），都只和门户 / API 交互。
 
 ## 数据流水线
 
@@ -200,7 +200,7 @@ DealNews 的 feed 要求保留它自己的推荐链接，这部分没有我们�
 | [Keepa API](https://keepa.com/api-docs/) | 起价 49 欧元/月 | 付费即可 | Amazon 价格历史、deal 列表 | 能拿到数据，但按 Amazon 政策，用它展示价格就不能挂 Amazon 联盟链接 |
 | [SerpApi](https://serpapi.com/pricing) | 每月 250 次免费 | 无 | Google Shopping 里的跨零售商报价 | 本质是抓 Google，商用有条款风险 |
 | [Impact](https://help.impact.com/partner/what-would-you-like-to-learn-about/platform-features/marketing-content/product-marketplace-and-catalogs/download-product-catalogs-as-a-partner) / CJ / Rakuten 商品 feed | 免费 | 需有网站并逐个品牌申请 | 商品目录、价格（每日同步） | 开放注册的门户本身就是申请所需的网站 |
-| Micro Center | — | 无 API、无联盟计划 | — | 见[待定问题](#待定问题) |
+| Micro Center | — | 无 API、无联盟计划 | — | 由用户采集端采集，见[决策 #6](decisions.md) |
 
 ### Deal 聚合 feed
 
@@ -218,7 +218,7 @@ DealNews 的 feed 要求保留它自己的推荐链接，这部分没有我们�
 
 | 零售商 | 反爬 | 难度 | 建议 |
 | --- | --- | --- | --- |
-| Micro Center | Cloudflare（零星 403） | 中；家用 IP + Safari 指纹已验证可用 | 由家用采集节点低频抓 |
+| Micro Center | Cloudflare（零星 403） | 中；住宅 IP 已验证可用 | 用户采集端低频抓，遇拦即停 |
 | Best Buy | Akamai；robots.txt 禁止 | 搜索页可读，商品页会断开连接 | 改用 API |
 | Newegg | Cloudflare（未验证） | 中 | 走联盟 feed |
 | B&H | PerimeterX（未验证） | 中高 | 走联盟 |
@@ -299,13 +299,13 @@ Deal 提醒在 CAN-SPAM 里算商业邮件（带联盟链接时更是），注�
 
 ## 托管与成本估算
 
-一台小 VPS 跑门户、数据库和走 API 的采集，家里现有的 Docker 继续负责 Micro Center 这类只认住宅 IP 的抓取。公开上线后固定成本约每月 30–40 美元，加 Amazon 再多 49 欧元。
+一台小 VPS 跑门户、数据库和走 API 的采集，Micro Center 这类只认住宅 IP 的抓取交给用户采集端。公开上线后固定成本约每月 30–40 美元，加 Amazon 再多 49 欧元。
 
 | 项目 | 选择 | 每月成本 |
 | --- | --- | --- |
 | 服务器 | 一台 2 核 4GB VPS，Docker Compose 跑 Postgres、后端、工作进程、Caddy | 约 6–12 美元（[Hetzner 2026 年两次涨价](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do)后 CX23 为 5.49 欧元，美国机房更贵，未核实） |
 | 备份 | 每日数据库备份到对象存储 | 约 1–2 美元 |
-| 家用采集节点 | 现有 openbox-monitor 容器改成只抓取、推送结果 | 0 |
+| 用户采集端 | 浏览器扩展 + Docker 采集器（openbox-monitor 改造）；Chrome Web Store 一次性注册费 | 0 |
 | 域名 | Cloudflare | 约 1 美元（按年付折算） |
 | 邮件 | 开发期 Resend 免费档；上线用 Pro | 0 → 20 美元 |
 | 注册防机器人 | Cloudflare Turnstile | 0 |
@@ -334,7 +334,7 @@ Deal 提醒在 CAN-SPAM 里算商业邮件（带联盟链接时更是），注�
 
 ## 实施路线
 
-分五步走，每步都能单独用起来；周数按业余时间粗估。
+黑五前（11 月 27 日）的逐日计划见 [plan-black-friday.md](plan-black-friday.md)：先上线“采集 → 共享存档 → 规则 → 邮件提醒”，下面第 4 步（商业化）放到黑五之后。原始的五步划分保留如下。
 
 1. 重构（约 1–2 周）：把 openbox-monitor 拆成 source adapter + 公共流水线，SQLite 换 Postgres，加入统一分类和商品表。完成标准：现有功能不变，老测试全过。
 2. 数据源（约 2 周）：接 Best Buy API（key 下来后）、Woot API、DealNews RSS；商品匹配（GTIN → MPN → 型号正则）。完成标准：同一型号能在两家店对上。
@@ -348,7 +348,7 @@ Deal 提醒在 CAN-SPAM 里算商业邮件（带联盟链接时更是），注�
 
 已定：商业化、开放注册（见 [decisions.md](decisions.md)）。还需要决定：
 
-- [ ] **Micro Center 怎么用？** 它没有 API 也没有联盟计划，抓来的数据放进收费产品风险最高，也没有佣金。选项：(a) 只给自己用，不对外展示；(b) 对注册用户展示，低频、注明来源、只链接回原站，同时写信问 Micro Center 是否同意；(c) 先 (a)，拿到书面许可再 (b)。建议 (c)。
+- [x] **Micro Center 怎么用？** 已定：用户在自己的网络上采集，汇总后共享（[决策 #6](decisions.md)）。仍建议上线后写信问 Micro Center。
 - [ ] **要不要覆盖 Amazon？** 两条路互斥：(a) Keepa（每月 49 欧元起）展示价格，但按 Amazon 政策不能同时挂 Amazon 联盟链接，没有佣金；(b) 先申请 Associates，180 天内做出 3 笔销售保住账号，近 30 天 10 笔后用 Creators API 取价格并挂联盟链接。建议先不做 Amazon，等其他来源带来流量后走 (b)。
 - [ ] **Slickdeals：** 只用于内部规则匹配，还是去申请授权后在门户展示？
 - [ ] **Pro 定价与配额：** 草案是 Free 3 条规则 + 每日摘要，Pro 50 条 + 即时提醒，价格待定。
