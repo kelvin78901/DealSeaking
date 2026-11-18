@@ -1,0 +1,14 @@
+{
+  "name": "4TB+ NVMe SSD low price",
+  "target": {"category": "storage/ssd/nvme", "keywords_exclude": ["heatsink only", "enclosure"]},
+  "conditions": {
+    "min_capacity_gb": 4000,
+    "any": [{"max_price_per_tb": 70}, {"historical_low": true}],
+    "conditions_allowed": ["new", "open_box"],
+    "sources": ["microcenter", "bestbuy", "woot"],
+    "store_radius_miles": 30
+  },
+  "events": ["new", "price_drop", "restock"],
+  "delivery": {"mode": "instant", "channels": ["email"], "cooldown_hours": 24,
+               "quiet_hours": ["23:00", "08:00"], "else": "daily_digest"}
+}
